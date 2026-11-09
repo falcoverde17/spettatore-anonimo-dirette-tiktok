@@ -116,6 +116,9 @@
         let messageQueue = [];
         let isProcessingQueue = false;
 
+        // ⚠️ INSERISCI QUI SOTTO IL LINK DEL TUO CLOUDFLARE WORKER ⚠️
+        const WORKER_URL = "https://IL-TUO-WORKER.workers.dev";
+
         function showStatus(text, autoHide = false) {
             const overlay = document.getElementById('status-overlay');
             overlay.innerText = text;
@@ -143,13 +146,10 @@
             messageQueue = [];
 
             try {
-                const targetUrl = "https://tiktokstalker.com/api/tiktok/get-live";
-                const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(targetUrl);
-                
-                let res = await fetch(proxyUrl, {
+                let res = await fetch(WORKER_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: username })
+                    body: JSON.stringify({ action: 'stream', username: username })
                 });
                 
                 let resData = await res.json();
@@ -197,13 +197,15 @@
         async function fetchChatFeed() {
             if (!currentRoomId) return;
             try {
-                const targetUrl = `https://tiktokstalker.com/api/tiktok/get-live-chat`;
-                const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(targetUrl);
-
-                let res = await fetch(proxyUrl, {
+                let res = await fetch(WORKER_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ room_id: currentRoomId, cursor: currentCursor, gift_cursor: currentGiftCursor })
+                    body: JSON.stringify({ 
+                        action: 'chat', 
+                        room_id: currentRoomId, 
+                        cursor: currentCursor, 
+                        gift_cursor: currentGiftCursor 
+                    })
                 });
                 let resData = await res.json();
                 let data = resData.data || {};
