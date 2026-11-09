@@ -145,12 +145,8 @@
             messageQueue = [];
 
             try {
-                let res = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'stream', username: username })
-                });
-                
+                const targetUrl = `${WORKER_URL}?action=stream&username=${encodeURIComponent(username)}`;
+                let res = await fetch(targetUrl);
                 let resData = await res.json();
                 let data = resData.data || {};
                 let room_id = data.roomId || "";
@@ -196,16 +192,8 @@
         async function fetchChatFeed() {
             if (!currentRoomId) return;
             try {
-                let res = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        action: 'chat', 
-                        room_id: currentRoomId, 
-                        cursor: currentCursor, 
-                        gift_cursor: currentGiftCursor 
-                    })
-                });
+                const targetUrl = `${WORKER_URL}?action=chat&room_id=${currentRoomId}&cursor=${currentCursor}&gift_cursor=${currentGiftCursor}`;
+                let res = await fetch(targetUrl);
                 let resData = await res.json();
                 let data = resData.data || {};
                 
