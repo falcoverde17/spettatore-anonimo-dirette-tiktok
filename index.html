@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <!-- PWA Meta Tags per installazione nativa -->
+    <!-- PWA Meta Tags -->
     <link rel="manifest" href="./manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,7 +13,7 @@
     <link rel="icon" type="image/svg+xml" href="./icon.svg">
     <link rel="apple-touch-icon" href="./icon.svg">
 
-    <title>TikTok Live Ultimate Dashboard - Unlimited</title>
+    <title>TikTok Live Dashboard PWA</title>
     <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
     <style>
         body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
@@ -69,7 +69,7 @@
 <body>
 
     <header id="mainHeader">
-        <div class="brand">⚡ TIKTOK LIVE ULTIMATE</div>
+        <div class="brand">⚡ TIKTOK LIVE PWA</div>
         <div class="controls-bar">
             <input type="text" id="username" placeholder="Username (es. f.m.spettacoli)" />
             <button onclick="startLive()">Avvia Stream</button>
@@ -92,7 +92,7 @@
                 <button class="toggle-btn" onclick="toggleTwitchMode()">📺 Modalità Twitch</button>
             </div>
             <div id="chat">
-                <div class="msg"><span>Sistema:</span> Pronto. Inserisci l'username per agganciare la live.</div>
+                <div class="msg"><span>Sistema:</span> Inserisci l'username per avviare il flusso.</div>
             </div>
         </div>
     </div>
@@ -115,32 +115,60 @@
             }
         }
 
+        // Recupera la pagina web provando diversi mirror CORS se uno fallisce
+        async function fetchTikTokHTML(username) {
+            const targetUrl = `https://www.tiktok.com/@${username}/live`;
+            
+            const proxies = [
+                async () => {
+                    let r = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
+                    return await r.text();
+                },
+                async () => {
+                    let r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                    let j = await r.json();
+                    return j.contents;
+                },
+                async () => {
+                    let r = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+                    return await r.text();
+                }
+            ];
+
+            for (let i = 0; i < proxies.length; i++) {
+                try {
+                    showStatus(`Ricerca live (tentativo ${i + 1})...`);
+                    let html = await proxies[i]();
+                    if (html && (html.includes('SIGI_STATE') || html.includes('__UNIVERSAL_DATA_FOR_REHYDRATION__'))) {
+                        return html;
+                    }
+                } catch(e) {
+                    console.log(`Proxy ${i+1} fallito:`, e);
+                }
+            }
+            return null;
+        }
+
         async function startLive() {
             let username = document.getElementById('username').value.trim();
             if (!username) return alert("Inserisci un username!");
             username = username.replace('@', '');
             
-            showStatus("Ricerca live per @" + username + " in corso...");
+            showStatus("Connessione a @" + username + "...");
 
             try {
-                // Sfrutta un proxy CORS gratuito e aperto per prelevare la pagina pubblica senza blocchi fissi sull'IP
-                const targetProfileUrl = `https://www.tiktok.com/@${username}/live`;
-                const proxyApiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetProfileUrl)}`;
-                
-                let res = await fetch(proxyApiUrl);
-                let jsonRes = await res.json();
-                
-                if (!jsonRes.contents) {
-                    showStatus("⚠️ Impossibile contattare il servizio di proxy.");
+                let htmlText = await fetchTikTokHTML(username);
+
+                if (!htmlText) {
+                    showStatus("⚠️ Impossibile accedere alla pagina (connessione bloccata o utente offline).");
                     return;
                 }
 
-                let htmlText = jsonRes.contents;
                 let match = htmlText.match(/<script id="SIGI_STATE" type="application\/json">([\s\S]*?)<\/script>/) ||
                             htmlText.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">([\s\S]*?)<\/script>/);
 
                 if (!match) {
-                    showStatus("⚠️ Utente offline o non trovato.");
+                    showStatus("⚠️ Impossibile analizzare la live (utente offline o contenuto protetto).");
                     return;
                 }
 
@@ -163,17 +191,17 @@
                 let flvUrl = streamData.data.main.flv.hd || streamData.data.main.flv.sd;
 
                 if (flvUrl) {
-                    showStatus("✅ Flusso agganciato con successo!", true);
+                    showStatus("✅ Flusso agganciato!", true);
                     playFlv(flvUrl);
 
                     document.getElementById('viewerCount').innerText = roomDetails.user_count || 0;
                     document.getElementById('likeCount').innerText = roomDetails.like_count || 0;
                 } else {
-                    showStatus("⚠️ Flusso video FLV non trovato.");
+                    showStatus("⚠️ Flusso video FLV non estratto.");
                 }
 
             } catch(e) {
-                showStatus("❌ Errore di caricamento.");
+                showStatus("❌ Errore durante l'elaborazione.");
                 console.error(e);
             }
         }
