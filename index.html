@@ -143,9 +143,8 @@
             messageQueue = [];
 
             try {
-                // Usiamo un CORS proxy pubblico per aggirare il blocco del browser
                 const targetUrl = "https://tiktokstalker.com/api/tiktok/get-live";
-                const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl);
+                const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(targetUrl);
                 
                 let res = await fetch(proxyUrl, {
                     method: 'POST',
@@ -199,7 +198,7 @@
             if (!currentRoomId) return;
             try {
                 const targetUrl = `https://tiktokstalker.com/api/tiktok/get-live-chat`;
-                const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl);
+                const proxyUrl = "https://corsproxy.io/?" + encodeURIComponent(targetUrl);
 
                 let res = await fetch(proxyUrl, {
                     method: 'POST',
