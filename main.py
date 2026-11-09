@@ -183,7 +183,7 @@ HTML_CONTENT = """
             messageQueue = [];
 
             try {
-                let res = await fetch('/api/stream/' + username);
+                let res = await fetch('/api/stream/' + encodeURIComponent(username));
                 let data = await res.json();
                 
                 if (data.stream_url && data.room_id) {
@@ -197,7 +197,7 @@ HTML_CONTENT = """
 
                     chatInterval = setInterval(fetchChatFeed, 1000);
                 } else {
-                    showStatus("⚠️ Impossibile trovare il flusso (utente offline).");
+                    showStatus("⚠️ Impossibile trovare il flusso (utente offline o username non corretto).");
                 }
             } catch(e) {
                 showStatus("❌ Errore di comunicazione.");
@@ -365,30 +365,39 @@ async def icon():
 
 @app.get("/api/stream/{username}")
 async def get_stream(username: str):
+    # Ripulisce l'username eliminando spazi o chiocciole inserite dall'utente
+    clean_username = username.strip().replace('@', '')
+    
     api_url = "https://tiktokstalker.com/api/tiktok/get-live"
-    payload = {"username": username}
+    payload = {"username": clean_username}
     headers = {
         "Content-Type": "application/json",
         "Origin": "https://tiktokstalker.com",
         "Referer": "https://tiktokstalker.com/it/tiktok-live-viewer",
-        "User-Agent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.post(api_url, json=payload, headers=headers)
             if response.status_code == 200:
                 res_data = response.json()
                 data = res_data.get("data", {})
+                
+                if not data or "roomId" not in data:
+                    return {"stream_url": "", "room_id": ""}
+                
                 room_id = data.get("roomId", "")
                 streams = data.get("streams", [])
                 
                 stream_url = ""
+                # Priorità 1: Cerca il codec h264 con URL FLV
                 for s in streams:
                     flv = s.get("flv", "")
                     if s.get("codec") == "h264" and flv:
                         stream_url = flv
                         break
                 
+                # Priorità 2: Prendi qualsiasi FLV disponibile se h264 manca
                 if not stream_url:
                     for s in streams:
                         flv = s.get("flv", "")
@@ -398,7 +407,7 @@ async def get_stream(username: str):
                             
                 return {"stream_url": stream_url, "room_id": room_id}
     except Exception as e:
-        print(f"Errore stream: {e}")
+        print(f"Errore recupero stream: {e}")
     return {"stream_url": "", "room_id": ""}
 
 @app.get("/api/feed")
@@ -413,14 +422,14 @@ async def get_feed(room_id: str, cursor: str = "0", gift_cursor: str = "0"):
         "Content-Type": "application/json",
         "Origin": "https://tiktokstalker.com",
         "Referer": "https://tiktokstalker.com/it/tiktok-live-viewer",
-        "User-Agent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=12.0) as client:
             response = await client.post(feed_url, json=payload, headers=headers)
             if response.status_code == 200:
                 res_data = response.json()
                 return res_data.get("data", {"messages": [], "gifts": [], "likes": [], "stats": {}, "cursor": cursor, "giftCursor": gift_cursor})
     except Exception as e:
-        print(f"Errore feed chat stalker: {e}")
+        print(f"Errore recupero chat feed: {e}")
     return {"messages": [], "gifts": [], "likes": [], "stats": {}, "cursor": cursor, "giftCursor": gift_cursor}
