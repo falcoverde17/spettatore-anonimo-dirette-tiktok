@@ -183,7 +183,7 @@ HTML_CONTENT = """
             messageQueue = [];
 
             try {
-                let res = await fetch(`/api/stream/${username}`);
+                let res = await fetch('/api/stream/' + username);
                 let data = await res.json();
                 
                 if (data.stream_url && data.room_id) {
@@ -207,7 +207,7 @@ HTML_CONTENT = """
         async function fetchChatFeed() {
             if (!currentRoomId) return;
             try {
-                let res = await fetch(`/api/feed?room_id=${currentRoomId}&cursor=${currentCursor}&gift_cursor=${currentGiftCursor}`);
+                let res = await fetch('/api/feed?room_id=' + currentRoomId + '&cursor=' + currentCursor + '&gift_cursor=' + currentGiftCursor);
                 let data = await res.json();
                 
                 if (data.cursor) currentCursor = data.cursor;
@@ -227,14 +227,14 @@ HTML_CONTENT = """
 
                 if (data.gifts && data.gifts.length > 0) {
                     data.gifts.forEach(g => {
-                        let giftText = `🎁 Ha inviato ${g.gift_name || 'un regalo'} (x${g.repeat_count || 1})!`;
+                        let giftText = "🎁 Ha inviato " + (g.gift_name || 'un regalo') + " (x" + (g.repeat_count || 1) + ")!";
                         messageQueue.push({ user: g.nickname || g.username, text: giftText, type: 'gift' });
                     });
                 }
 
                 if (data.likes && data.likes.length > 0) {
                     data.likes.forEach(l => {
-                        let likeText = `❤️ Ha fatto ${l.count || 1} tap sullo schermo!`;
+                        let likeText = "❤️ Ha fatto " + (l.count || 1) + " tap sullo schermo!";
                         messageQueue.push({ user: l.nickname || l.username, text: likeText, type: 'like' });
                     });
                 }
@@ -276,7 +276,7 @@ HTML_CONTENT = """
                 '[thumbsup]': '👍',
                 '[cool]': '😎'
             };
-            return text.replace(/\[([a-zA-Z0-9]+)\]/g, (match, tag) => {
+            return text.replace(/\\[([a-zA-Z0-9]+)\\]/g, (match, tag) => {
                 return emojiMap[match.toLowerCase()] || match;
             });
         }
@@ -320,7 +320,7 @@ HTML_CONTENT = """
                 div.className = "msg";
             }
             
-            div.innerHTML = `<span>${user}:</span> ${text}`;
+            div.innerHTML = "<span>" + user + ":</span> " + text;
             chatBox.appendChild(div);
             
             if (chatBox.children.length > 100) {
@@ -347,7 +347,7 @@ HTML_CONTENT = """
 </html>
 """
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def get():
     return HTMLResponse(HTML_CONTENT)
 
@@ -411,7 +411,6 @@ async def get_feed(room_id: str, cursor: str = "0", gift_cursor: str = "0"):
     }
     headers = {
         "Content-Type": "application/json",
-        "Origin": "https://tiktokxls.com" if False else "https://tiktokstalker.com",
         "Origin": "https://tiktokstalker.com",
         "Referer": "https://tiktokstalker.com/it/tiktok-live-viewer",
         "User-Agent": "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
