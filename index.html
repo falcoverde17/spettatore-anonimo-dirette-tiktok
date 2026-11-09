@@ -13,7 +13,7 @@
     <link rel="icon" type="image/svg+xml" href="./icon.svg">
     <link rel="apple-touch-icon" href="./icon.svg">
 
-    <title>TikTok Live Ultimate Dashboard - Stalker Edition</title>
+    <title>TikTok Live Ultimate Dashboard - Unlimited Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
     <style>
         body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
@@ -58,12 +58,6 @@
         
         .msg { background: rgba(24, 24, 27, 0.8); padding: 8px 12px; border-radius: 6px; font-size: 13px; border-left: 3px solid #25F4EE; line-height: 1.4; word-break: break-word; }
         .msg span { font-weight: bold; color: #25F4EE; display: inline-block; margin-right: 6px; }
-        
-        .msg.gift { border-left-color: #FE2C55; background: rgba(254, 44, 85, 0.15); }
-        .msg.gift span { color: #FE2C55; }
-
-        .msg.like { border-left-color: #FFD700; background: rgba(255, 215, 0, 0.1); }
-        .msg.like span { color: #FFD700; }
 
         @media (max-width: 768px) {
             .main-container { flex-direction: column; }
@@ -76,7 +70,7 @@
 <body>
 
     <header id="mainHeader">
-        <div class="brand">⚡ TIKTOK LIVE STALKER</div>
+        <div class="brand">⚡ TIKTOK LIVE UNLIMITED</div>
         <div class="controls-bar">
             <input type="text" id="username" placeholder="Username (es. f.m.spettacoli)" />
             <button onclick="startLive()">Avvia Stream</button>
@@ -95,10 +89,12 @@
         
         <div class="chat-section" id="chatSection">
             <div class="chat-header">
-                <span>💬 CHAT & GIFT REALTIME</span>
+                <span>💬 STATISTICHE LIVE</span>
                 <button class="toggle-btn" onclick="toggleTwitchMode()">📺 Modalità Twitch</button>
             </div>
-            <div id="chat"></div>
+            <div id="chat">
+                <div class="msg"><span>Sistema:</span> Dashboard pronta. Inserisci l'username di un utente in live.</div>
+            </div>
         </div>
     </div>
 
@@ -108,27 +104,16 @@
         }
 
         let player = null;
-        let chatInterval = null;
-        let currentRoomId = null;
-        let currentCursor = "0";
-        let currentGiftCursor = "0";
         let statusTimeout = null;
-        let messageQueue = [];
-        let isProcessingQueue = false;
-
         const WORKER_URL = "https://tiktok-proxy.falco-verde17.workers.dev";
 
         function showStatus(text, autoHide = false) {
             const overlay = document.getElementById('status-overlay');
             overlay.innerText = text;
             overlay.classList.remove('fade-out');
-            
             if (statusTimeout) clearTimeout(statusTimeout);
-            
             if (autoHide) {
-                statusTimeout = setTimeout(() => {
-                    overlay.classList.add('fade-out');
-                }, 3500);
+                statusTimeout = setTimeout(() => { overlay.classList.add('fade-out'); }, 3500);
             }
         }
 
@@ -137,129 +122,36 @@
             if (!username) return alert("Inserisci un username!");
             username = username.replace('@', '');
             
-            showStatus("Connessione a @" + username + " in corso...");
-            
-            if (chatInterval) clearInterval(chatInterval);
-            currentCursor = "0";
-            currentGiftCursor = "0";
-            messageQueue = [];
+            showStatus("Connessione diretta a @" + username + "...");
 
             try {
                 const targetUrl = `${WORKER_URL}?action=stream&username=${encodeURIComponent(username)}`;
                 let res = await fetch(targetUrl);
                 let resData = await res.json();
-                let data = resData.data || {};
-                let room_id = data.roomId || "";
-                let streams = data.streams || [];
                 
-                let stream_url = "";
-                for (let s of streams) {
-                    let flv = s.flv || "";
-                    if (s.codec === "h264" && flv) {
-                        stream_url = flv;
-                        break;
-                    }
+                if (!resData.data || !resData.data.streams) {
+                    showStatus("⚠️ Impossibile trovare la live (utente offline o inesistente).");
+                    return;
                 }
-                if (!stream_url) {
-                    for (let s of streams) {
-                        let flv = s.flv || "";
-                        if (flv) {
-                            stream_url = flv;
-                            break;
-                        }
-                    }
-                }
-                
-                if (stream_url && room_id) {
-                    currentRoomId = room_id;
-                    showStatus("✅ Flusso attivo per @" + username, true);
-                    playFlv(stream_url);
-                    
-                    const chatBox = document.getElementById('chat');
-                    chatBox.innerHTML = '';
-                    addChatMsgDirect("Sistema", "Connessione stabilita con successo.", "msg");
 
-                    chatInterval = setInterval(fetchChatFeed, 1000);
+                let data = resData.data;
+                let stream_url = data.streams[0].flv;
+
+                if (stream_url) {
+                    showStatus("✅ Flusso agganciato per @" + username, true);
+                    playFlv(stream_url);
+
+                    if (data.stats) {
+                        document.getElementById('viewerCount').innerText = data.stats.user_count || 0;
+                        document.getElementById('likeCount').innerText = data.stats.like_count || 0;
+                    }
                 } else {
-                    showStatus("⚠️ Impossibile trovare il flusso (utente offline).");
+                    showStatus("⚠️ Flusso video non disponibile.");
                 }
             } catch(e) {
-                showStatus("❌ Errore di comunicazione.");
+                showStatus("❌ Errore di connessione al proxy.");
                 console.error(e);
             }
-        }
-
-        async function fetchChatFeed() {
-            if (!currentRoomId) return;
-            try {
-                const targetUrl = `${WORKER_URL}?action=chat&room_id=${currentRoomId}&cursor=${currentCursor}&gift_cursor=${currentGiftCursor}`;
-                let res = await fetch(targetUrl);
-                let resData = await res.json();
-                let data = resData.data || {};
-                
-                if (data.cursor) currentCursor = data.cursor;
-                if (data.giftCursor) currentGiftCursor = data.giftCursor;
-
-                if (data.stats) {
-                    document.getElementById('viewerCount').innerText = data.stats.user_count || 0;
-                    document.getElementById('likeCount').innerText = data.stats.like_count || data.stats.digg_count || 0;
-                }
-
-                if (data.messages && data.messages.length > 0) {
-                    data.messages.forEach(m => {
-                        let formattedText = formatEmojis(m.text);
-                        messageQueue.push({ user: m.nickname || m.username, text: formattedText, type: 'msg' });
-                    });
-                }
-
-                if (data.gifts && data.gifts.length > 0) {
-                    data.gifts.forEach(g => {
-                        let giftText = `🎁 Ha inviato ${g.gift_name || 'un regalo'} (x${g.repeat_count || 1})!`;
-                        messageQueue.push({ user: g.nickname || g.username, text: giftText, type: 'gift' });
-                    });
-                }
-
-                if (data.likes && data.likes.length > 0) {
-                    data.likes.forEach(l => {
-                        let likeText = `❤️ Ha fatto ${l.count || 1} tap sullo schermo!`;
-                        messageQueue.push({ user: l.nickname || l.username, text: likeText, type: 'like' });
-                    });
-                }
-
-                processMessageQueue();
-            } catch(e) {
-                console.log("Errore fetch feed chat:", e);
-            }
-        }
-
-        function processMessageQueue() {
-            if (isProcessingQueue || messageQueue.length === 0) return;
-            isProcessingQueue = true;
-
-            const batchSize = Math.min(messageQueue.length, 5);
-            for (let i = 0; i < batchSize; i++) {
-                const msgData = messageQueue.shift();
-                addChatMsgDirect(msgData.user, msgData.text, msgData.type);
-            }
-
-            setTimeout(() => {
-                isProcessingQueue = false;
-                if (messageQueue.length > 0) {
-                    processMessageQueue();
-                }
-            }, 50);
-        }
-
-        function formatEmojis(text) {
-            if (!text) return "";
-            const emojiMap = {
-                '[heart]': '❤️', '[love]': '😍', '[fire]': '🔥',
-                '[laugh]': '😂', '[smile]': '😊', '[applause]': '👏',
-                '[rose]': '🌹', '[thumbsup]': '👍', '[cool]': '😎'
-            };
-            return text.replace(/\[([a-zA-Z0-9]+)\]/g, (match, tag) => {
-                return emojiMap[match.toLowerCase()] || match;
-            });
         }
 
         function playFlv(url) {
@@ -283,16 +175,6 @@
             } else {
                 alert("Il browser non supporta mpegts.js MSE.");
             }
-        }
-
-        function addChatMsgDirect(user, text, type) {
-            const chatBox = document.getElementById('chat');
-            const div = document.createElement('div');
-            div.className = type === 'gift' ? "msg gift" : (type === 'like' ? "msg like" : "msg");
-            div.innerHTML = `<span>${user}:</span> ${text}`;
-            chatBox.appendChild(div);
-            if (chatBox.children.length > 100) chatBox.removeChild(chatBox.firstChild);
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function toggleTwitchMode() {
