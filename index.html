@@ -13,7 +13,7 @@
     <link rel="icon" type="image/svg+xml" href="./icon.svg">
     <link rel="apple-touch-icon" href="./icon.svg">
 
-    <title>TikTok Live Ultimate Dashboard - Unlimited Edition</title>
+    <title>TikTok Live Ultimate Dashboard - Unlimited</title>
     <script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.7.3/dist/mpegts.js"></script>
     <style>
         body { background: #0f0f0f; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; overflow: hidden; }
@@ -55,7 +55,6 @@
         .toggle-btn:hover { background: #3f3f46; }
 
         #chat { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-        
         .msg { background: rgba(24, 24, 27, 0.8); padding: 8px 12px; border-radius: 6px; font-size: 13px; border-left: 3px solid #25F4EE; line-height: 1.4; word-break: break-word; }
         .msg span { font-weight: bold; color: #25F4EE; display: inline-block; margin-right: 6px; }
 
@@ -70,7 +69,7 @@
 <body>
 
     <header id="mainHeader">
-        <div class="brand">⚡ TIKTOK LIVE UNLIMITED</div>
+        <div class="brand">⚡ TIKTOK LIVE ULTIMATE</div>
         <div class="controls-bar">
             <input type="text" id="username" placeholder="Username (es. f.m.spettacoli)" />
             <button onclick="startLive()">Avvia Stream</button>
@@ -93,7 +92,7 @@
                 <button class="toggle-btn" onclick="toggleTwitchMode()">📺 Modalità Twitch</button>
             </div>
             <div id="chat">
-                <div class="msg"><span>Sistema:</span> Dashboard pronta. Inserisci l'username di un utente in live.</div>
+                <div class="msg"><span>Sistema:</span> Pronto. Inserisci l'username per agganciare la live.</div>
             </div>
         </div>
     </div>
@@ -105,7 +104,6 @@
 
         let player = null;
         let statusTimeout = null;
-        const WORKER_URL = "https://tiktok-proxy.falco-verde17.workers.dev";
 
         function showStatus(text, autoHide = false) {
             const overlay = document.getElementById('status-overlay');
@@ -122,34 +120,60 @@
             if (!username) return alert("Inserisci un username!");
             username = username.replace('@', '');
             
-            showStatus("Connessione diretta a @" + username + "...");
+            showStatus("Ricerca live per @" + username + " in corso...");
 
             try {
-                const targetUrl = `${WORKER_URL}?action=stream&username=${encodeURIComponent(username)}`;
-                let res = await fetch(targetUrl);
-                let resData = await res.json();
+                // Sfrutta un proxy CORS gratuito e aperto per prelevare la pagina pubblica senza blocchi fissi sull'IP
+                const targetProfileUrl = `https://www.tiktok.com/@${username}/live`;
+                const proxyApiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetProfileUrl)}`;
                 
-                if (!resData.data || !resData.data.streams) {
-                    showStatus("⚠️ Impossibile trovare la live (utente offline o inesistente).");
+                let res = await fetch(proxyApiUrl);
+                let jsonRes = await res.json();
+                
+                if (!jsonRes.contents) {
+                    showStatus("⚠️ Impossibile contattare il servizio di proxy.");
                     return;
                 }
 
-                let data = resData.data;
-                let stream_url = data.streams[0].flv;
+                let htmlText = jsonRes.contents;
+                let match = htmlText.match(/<script id="SIGI_STATE" type="application\/json">([\s\S]*?)<\/script>/) ||
+                            htmlText.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">([\s\S]*?)<\/script>/);
 
-                if (stream_url) {
-                    showStatus("✅ Flusso agganciato per @" + username, true);
-                    playFlv(stream_url);
-
-                    if (data.stats) {
-                        document.getElementById('viewerCount').innerText = data.stats.user_count || 0;
-                        document.getElementById('likeCount').innerText = data.stats.like_count || 0;
-                    }
-                } else {
-                    showStatus("⚠️ Flusso video non disponibile.");
+                if (!match) {
+                    showStatus("⚠️ Utente offline o non trovato.");
+                    return;
                 }
+
+                let sigiData = JSON.parse(match[1]);
+                let roomInfo = null;
+
+                if (sigiData.LiveRoom && sigiData.LiveRoom.liveRoomUserInfo) {
+                    roomInfo = sigiData.LiveRoom.liveRoomUserInfo;
+                } else if (sigiData.__DEFAULT_SCOPE__ && sigiData.__DEFAULT_SCOPE__['webapp-room']) {
+                    roomInfo = sigiData.__DEFAULT_SCOPE__['webapp-room'].liveRoomUserInfo;
+                }
+
+                if (!roomInfo || !roomInfo.room) {
+                    showStatus("⚠️ L'utente non è attualmente in live.");
+                    return;
+                }
+
+                let roomDetails = roomInfo.room;
+                let streamData = JSON.parse(roomDetails.stream_url.live_core_sdk_data.pull_data.stream_data);
+                let flvUrl = streamData.data.main.flv.hd || streamData.data.main.flv.sd;
+
+                if (flvUrl) {
+                    showStatus("✅ Flusso agganciato con successo!", true);
+                    playFlv(flvUrl);
+
+                    document.getElementById('viewerCount').innerText = roomDetails.user_count || 0;
+                    document.getElementById('likeCount').innerText = roomDetails.like_count || 0;
+                } else {
+                    showStatus("⚠️ Flusso video FLV non trovato.");
+                }
+
             } catch(e) {
-                showStatus("❌ Errore di connessione al proxy.");
+                showStatus("❌ Errore di caricamento.");
                 console.error(e);
             }
         }
