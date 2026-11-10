@@ -365,7 +365,6 @@ async def icon():
 
 @app.get("/api/stream/{username}")
 async def get_stream(username: str):
-    # Ripulisce l'username eliminando spazi o chiocciole inserite dall'utente
     clean_username = username.strip().replace('@', '')
     
     api_url = "https://tiktokstalker.com/api/tiktok/get-live"
@@ -373,8 +372,10 @@ async def get_stream(username: str):
     headers = {
         "Content-Type": "application/json",
         "Origin": "https://tiktokstalker.com",
-        "Referer": "https://tiktokstalker.com/it/tiktok-live-viewer",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Referer": "https://tiktokstalker.com/",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
     }
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
@@ -390,14 +391,12 @@ async def get_stream(username: str):
                 streams = data.get("streams", [])
                 
                 stream_url = ""
-                # Priorità 1: Cerca il codec h264 con URL FLV
                 for s in streams:
                     flv = s.get("flv", "")
                     if s.get("codec") == "h264" and flv:
                         stream_url = flv
                         break
                 
-                # Priorità 2: Prendi qualsiasi FLV disponibile se h264 manca
                 if not stream_url:
                     for s in streams:
                         flv = s.get("flv", "")
@@ -421,8 +420,10 @@ async def get_feed(room_id: str, cursor: str = "0", gift_cursor: str = "0"):
     headers = {
         "Content-Type": "application/json",
         "Origin": "https://tiktokstalker.com",
-        "Referer": "https://tiktokstalker.com/it/tiktok-live-viewer",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        "Referer": "https://tiktokstalker.com/",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7"
     }
     try:
         async with httpx.AsyncClient(timeout=12.0) as client:
